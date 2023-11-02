@@ -1,5 +1,7 @@
 import socket
 from Bio.Seq import Seq
+from numba import njit
+from numba.openmp import openmp_context as openmp
 
 """
 Fução que vamos utilziar para realizar o processamento
@@ -13,9 +15,6 @@ def process_data(data):
     seq = Seq(data)
     complement_seq = seq.complement()
     return complement_seq
-
-HOST = 'localhost'
-PORT = 12345
 
 def receive_strings(client_socket):
     while True:
@@ -31,6 +30,19 @@ def receive_strings(client_socket):
         except ConnectionResetError:
             break
 
+@njit
+def process_genomas(genomas):
+    genomas_processados = []
+    with openmp("parallel"):
+        with openmp("for reduction(+:genomas_processados) schedule(static)"):
+            for genoma in genomas:
+                genomas_processados.append(process_data(genoma))
+
+    return genomas_processados
+
+HOST = 'localhost'
+PORT = 12345
+
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.bind((HOST, PORT))
     s.listen()
@@ -41,13 +53,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     with conn:
         print(f"Conectado por {addr}")
 
-        received_strings = []
-        for received_string in receive_strings(conn):
-            received_strings.append(received_string)
-            if len(received_strings) == 100:  # Imprime a cada 100 strings recebidas
-                print("Strings recebidas:", received_strings)
-                received_strings = []  # Limpa o buffer
+        genomas = []
+        for genomas in receive_strings(conn):
+            genomas.append(genomas)
+        
+        genomas_processados = process_genomas(genomas)
 
-        # Imprime qualquer string remanescente
-        if received_strings:
-            print("Strings finais recebidas:", received_strings)
+        if genomas_processados:
+            print("Genomas processados:", genomas_processados)
