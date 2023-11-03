@@ -23,4 +23,4 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         chunk = valores[i:i + chunk_size]
         send_strings(s, chunk)
 
-print("Array de strings enviado com sucesso para o servidor.")
+print("Dados enviados com sucesso para o servidor.")

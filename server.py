@@ -2,19 +2,36 @@ import socket
 from Bio.Seq import Seq
 from numba import njit
 from numba.openmp import openmp_context as openmp
+from numba.openmp import omp_get_wtime, omp_get_thread_num, omp_get_num_threads,omp_set_num_threads
+from numba.typed import List
 
 """
-Fução que vamos utilziar para realizar o processamento
+Fução que vamos utiliziar para realizar o processamento
+Converte a sequência de DNA em uma sequência complementar
 A na sequência original é substituído por T na sequência complementar.
 T na sequência original é substituído por A na sequência complementar.
 C na sequência original é substituído por G na sequência complementar.
 G na sequência original é substituído por C na sequência complementar.
 """
-def process_data(data):
-    # Converte a sequência de DNA em uma sequência complementar
-    seq = Seq(data)
-    complement_seq = seq.complement()
-    return complement_seq
+@njit
+def processarParalelamente(genomasRecebidos):
+    omp_set_num_threads(4)
+    steps = len(genomasRecebidos)
+    genomas_processados = List()
+
+    with openmp("parallel for"):
+        for i in range(steps):
+            seq = genomasRecebidos[i]
+            complemento = {"A": "T", "T": "A", "C": "G", "G": "C"}
+            complemento_inverso_seq = ""
+            for nucleotideo in seq:
+                if nucleotideo in complemento:
+                    complemento_inverso_seq += complemento[nucleotideo]
+                else:
+                    complemento_inverso_seq += nucleotideo  # Se não for A, T, C, ou G, mantém o mesmo caractere
+            genomas_processados.append(complemento_inverso_seq)
+    return genomas_processados
+
 
 def receive_strings(client_socket):
     while True:
@@ -30,16 +47,6 @@ def receive_strings(client_socket):
         except ConnectionResetError:
             break
 
-@njit
-def process_genomas(genomas):
-    genomas_processados = []
-    with openmp("parallel"):
-        with openmp("for reduction(+:genomas_processados) schedule(static)"):
-            for genoma in genomas:
-                genomas_processados.append(process_data(genoma))
-
-    return genomas_processados
-
 HOST = 'localhost'
 PORT = 12345
 
@@ -53,11 +60,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     with conn:
         print(f"Conectado por {addr}")
 
-        genomas = []
+        genomasRecebidos = []
         for genomas in receive_strings(conn):
-            genomas.append(genomas)
+            genomasRecebidos.append(genomas)
         
-        genomas_processados = process_genomas(genomas)
+        genomas_processados = processarParalelamente(genomasRecebidos)
 
         if genomas_processados:
-            print("Genomas processados:", genomas_processados)
+            print("Genomas processados:", len(genomas_processados))
