@@ -1,9 +1,11 @@
 import socket
-from Bio.Seq import Seq
 from numba import njit
 from numba.openmp import openmp_context as openmp
 from numba.openmp import omp_get_wtime, omp_get_thread_num, omp_get_num_threads,omp_set_num_threads
 from numba.typed import List
+
+import threading
+from mpi4py import MPI
 
 import struct
 import time 
@@ -17,6 +19,17 @@ T na sequência original é substituído por A na sequência complementar.
 C na sequência original é substituído por G na sequência complementar.
 G na sequência original é substituído por C na sequência complementar.
 """
+
+def processar_sequencia(seq):
+    complemento_inverso = ""
+    complemento = {"A": "T", "T": "A", "C": "G", "G": "C"}
+    for nucleotideo in seq:
+        if nucleotideo in complemento:
+            complemento_inverso += complemento[nucleotideo]
+        else:
+            complemento_inverso += nucleotideo  # Se não for A, T, C, ou G, mantém o mesmo caractere
+    return complemento_inverso
+
 @njit
 def processarParalelamenteOpenMP(genomasRecebidos, cores):
     omp_set_num_threads(cores)
@@ -26,18 +39,68 @@ def processarParalelamenteOpenMP(genomasRecebidos, cores):
     with openmp("parallel for"):
         for i in range(steps):
             seq = genomasRecebidos[i]
-            complemento = {"A": "T", "T": "A", "C": "G", "G": "C"}
-            complemento_inverso_seq = ""
-            for nucleotideo in seq:
-                if nucleotideo in complemento:
-                    complemento_inverso_seq += complemento[nucleotideo]
-                else:
-                    complemento_inverso_seq += nucleotideo  # Se não for A, T, C, ou G, mantém o mesmo caractere
+            complemento_inverso_seq = processar_sequencia(seq)
             genomas_processados.append(complemento_inverso_seq)
     return genomas_processados
 
 def processarParalelamenteThread(genomasRecebidos, cores):
+    steps = len(genomas_recebidos)
     genomas_processados = List()
+
+    def processar_thread(start, end):
+        for i in range(start, end):
+            seq = genomas_recebidos[i]
+            complemento_inverso_seq = processar_sequencia(seq)
+            genomas_processados.append(complemento_inverso_seq)
+
+    threads = []
+    batch_size = steps // cores
+
+    for i in range(cores):
+        start = i * batch_size
+        end = (i + 1) * batch_size if i < cores - 1 else steps
+        thread = threading.Thread(target=processar_thread, args=(start, end))
+        threads.append(thread)
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+
+    return genomas_processados
+
+def processarParalelamenteMpi(genomasRecebidos, cores):
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+
+    steps = len(genomas_recebidos)
+    genomas_processados = List()
+
+    # Distribuir as tarefas entre os processos
+    chunk_size = steps // size
+    start = rank * chunk_size
+    end = (rank + 1) * chunk_size if rank < size - 1 else steps
+
+    local_genomas = genomas_recebidos[start:end]
+
+    # Processar localmente
+    local_genomas_processados = [processar_sequencia(seq) for seq in local_genomas]
+
+    # Juntar os resultados de todos os processos
+    genomas_processados = comm.gather(local_genomas_processados, root=0)
+
+    if rank == 0:
+        # Apenas o processo mestre retorna os genomas processados
+        return [item for sublist in genomas_processados for item in sublist]
+    else:
+        return None
+
+def processarEmSerie(genomasRecebidos):
+    genomas_processados = List()
+
+    for seq in genomasRecebidos:
+        complemento_inverso_seq = processar_sequencia(seq)
+        genomas_processados.append(complemento_inverso_seq)
 
     return genomas_processados
 
@@ -103,6 +166,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             genomas_processados = processarParalelamenteOpenMP(genomasRecebidos, cores)
         elif(method == "Threads"):
             genomas_processados = processarParalelamenteThread(genomasRecebidos, cores)
+        elif(method == "MPI"):
+            genomas_processados = processarParalelamenteMpi(genomasRecebidos, cores)
+        elif(method == "Serial"):
+            genomas_processados = processarEmSerie(genomasRecebidos)
 
         end_time = time.time()
         processing_time = end_time - start_time
