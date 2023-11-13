@@ -174,8 +174,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         end_time = time.time()
         processing_time = end_time - start_time
 
+        print("Tempo processamento:", processing_time)
+
         if genomas_processados:
-            print("Genomas processados:", len(genomas_processados))
+            # print("Genomas processados:", len(genomas_processados))
 
             # Envio dados processados para client
             conn.send(struct.pack('!d', processing_time))
