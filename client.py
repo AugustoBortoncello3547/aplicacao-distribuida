@@ -15,12 +15,18 @@ def input_data():
     print("Escolha um método de paralelização:")
     print("1. OpenMP")
     print("2. Thread")
+    print("3. MPI")
+    print("4. Serial")
     choice = input("Digite o número correspondente ao método desejado: ")
 
     if choice == "1":
         method = "OpenMP"
     elif choice == "2":
         method = "Thread"
+    elif choice == "3":
+        method = "MPI"
+    elif choice == "4":
+        method = "Serial"
     else:
         print("Opção inválida. Escolha um método válido.")
         exit()
