@@ -89,11 +89,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         send_strings(s, chunk)
 
     # Receber resposta do server
-    time_data = s.recv(8)
-    processing_time = struct.unpack('!d', time_data)[0]
+    # time_data = s.recv(8)
+    # processing_time = struct.unpack('!d', time_data)[0]
 
-    genomasProcessados = []
-    for genomas in receive_strings(s):
-        genomasProcessados.append(genomas)
+    # genomasProcessados = []
+    # for genomas in receive_strings(s):
+    #     genomasProcessados.append(genomas)
 
 print("Dados enviados com sucesso para o servidor.")
