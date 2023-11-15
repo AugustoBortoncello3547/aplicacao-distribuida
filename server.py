@@ -1,15 +1,11 @@
 import socket
-from numba import njit
+from numba import njit, types
 from numba.openmp import openmp_context as openmp
-from numba.openmp import omp_get_wtime, omp_get_thread_num, omp_get_num_threads,omp_set_num_threads
-from numba.typed import List
-
-import threading
-from mpi4py import MPI
-
-import struct
 import time 
-
+import threading
+#from mpi4py import MPI
+from numba.openmp import omp_set_num_threads
+from numba.typed import List
 
 """
 Fução que vamos utiliziar para realizar o processamento
@@ -19,24 +15,16 @@ T na sequência original é substituído por A na sequência complementar.
 C na sequência original é substituído por G na sequência complementar.
 G na sequência original é substituído por C na sequência complementar.
 """
-@njit
-def processarParalelamenteOpenMP(genomasRecebidos, cores):
-    omp_set_num_threads(cores)
-    steps = len(genomasRecebidos)
-    genomas_processados = List()
 
-    with openmp("parallel for"):
-        for i in range(steps):
-            seq = genomasRecebidos[i]
-            complemento = {"A": "T", "T": "A", "C": "G", "G": "C"}
-            complemento_inverso_seq = ""
-            for nucleotideo in seq:
-                if nucleotideo in complemento:
-                    complemento_inverso_seq += complemento[nucleotideo]
-                else:
-                    complemento_inverso_seq += nucleotideo  # Se não for A, T, C, ou G, mantém o mesmo caractere
-            genomas_processados.append(complemento_inverso_seq)
-    return genomas_processados
+def processar_sequencia(seq):
+    complemento_inverso = ""
+    complemento = {"A": "T", "T": "A", "C": "G", "G": "C"}
+    for nucleotideo in seq:
+        if nucleotideo in complemento:
+            complemento_inverso += complemento[nucleotideo]
+        else:
+            complemento_inverso += nucleotideo  # Se não for A, T, C, ou G, mantém o mesmo caractere
+    return complemento_inverso
 
 def processarParalelamenteThread(genomasRecebidos, cores):
     steps = len(genomasRecebidos)
@@ -119,7 +107,7 @@ def recieve_metadata(client_socket):
     return method, cores, level
 
 HOST = 'localhost'
-PORT = 12343
+PORT = 12345
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.bind((HOST, PORT))
@@ -156,7 +144,23 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         start_time = time.time()
 
         if(method == "OpenMP"):
-            genomas_processados = processarParalelamenteOpenMP(genomasRecebidos, cores)
+            
+            omp_set_num_threads(cores)
+            steps = len(genomasRecebidos)
+            genomas_processados = List.empty_list(types.unicode_type)
+
+            with openmp("parallel for"):
+                for i in range(steps):
+                    seq = genomasRecebidos[i]
+                    complemento = {"A": "T", "T": "A", "C": "G", "G": "C"}
+                    complemento_inverso_seq = ""
+                    for nucleotideo in seq:
+                        if nucleotideo in complemento:
+                            complemento_inverso_seq += complemento[nucleotideo]
+                        else:
+                            complemento_inverso_seq += nucleotideo  # Se não for A, T, C, ou G, mantém o mesmo caractere
+                    genomas_processados.append(complemento_inverso_seq)
+
         elif(method == "Thread"):
             genomas_processados = processarParalelamenteThread(genomasRecebidos, cores)
         elif(method == "MPI"):

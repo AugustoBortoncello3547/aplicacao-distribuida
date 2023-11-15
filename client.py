@@ -11,7 +11,7 @@ valores = df["intergenicregion_sequence"].astype(str).tolist()
 
 # Configurações do cliente
 HOST = 'localhost'
-PORT = 12343
+PORT = 12345
 
 def input_data():
     # Solicita ao usuário escolher um método de paralelização
