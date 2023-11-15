@@ -11,7 +11,7 @@ valores = df["intergenicregion_sequence"].astype(str).tolist()
 
 # Configurações do cliente
 HOST = 'localhost'
-PORT = 12345
+PORT = 12343
 
 def input_data():
     # Solicita ao usuário escolher um método de paralelização
@@ -93,8 +93,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     print("\nEsperando resposta do servidor\n")
 
     # Receber resposta do server
-    time_data = s.recv(8)
-    processing_time = struct.unpack('!d', time_data)[0]
+    processing_time = s.recv(1024).decode("utf-8")
     
     genomasProcessados = []
     for genomas in receive_strings(s):
@@ -102,5 +101,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
     print("Tempo processamento:", processing_time)
     print("Genomas processados:", len(genomasProcessados))
+
+    s.close()
 
 print("Conexão finalizada com sucesso.")

@@ -19,17 +19,6 @@ T na sequência original é substituído por A na sequência complementar.
 C na sequência original é substituído por G na sequência complementar.
 G na sequência original é substituído por C na sequência complementar.
 """
-
-def processar_sequencia(seq):
-    complemento_inverso = ""
-    complemento = {"A": "T", "T": "A", "C": "G", "G": "C"}
-    for nucleotideo in seq:
-        if nucleotideo in complemento:
-            complemento_inverso += complemento[nucleotideo]
-        else:
-            complemento_inverso += nucleotideo  # Se não for A, T, C, ou G, mantém o mesmo caractere
-    return complemento_inverso
-
 @njit
 def processarParalelamenteOpenMP(genomasRecebidos, cores):
     omp_set_num_threads(cores)
@@ -39,7 +28,13 @@ def processarParalelamenteOpenMP(genomasRecebidos, cores):
     with openmp("parallel for"):
         for i in range(steps):
             seq = genomasRecebidos[i]
-            complemento_inverso_seq = processar_sequencia(seq)
+            complemento = {"A": "T", "T": "A", "C": "G", "G": "C"}
+            complemento_inverso_seq = ""
+            for nucleotideo in seq:
+                if nucleotideo in complemento:
+                    complemento_inverso_seq += complemento[nucleotideo]
+                else:
+                    complemento_inverso_seq += nucleotideo  # Se não for A, T, C, ou G, mantém o mesmo caractere
             genomas_processados.append(complemento_inverso_seq)
     return genomas_processados
 
@@ -124,7 +119,7 @@ def recieve_metadata(client_socket):
     return method, cores, level
 
 HOST = 'localhost'
-PORT = 12345
+PORT = 12343
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.bind((HOST, PORT))
@@ -180,7 +175,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
         if genomas_processados:
             # Envio dados processados para client
-            conn.send(struct.pack('!d', processing_time))
+            conn.send(str(processing_time).encode("utf-8"))
 
             for genoma in genomas_processados:
                 conn.send(len(genoma).to_bytes(1024, 'big'))
