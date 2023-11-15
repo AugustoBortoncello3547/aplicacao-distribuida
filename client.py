@@ -1,6 +1,9 @@
 import socket
 import pandas as pd
 
+import struct
+import time
+
 df = pd.read_csv("dados.csv", delimiter="\t")
 valores = df["intergenicregion_sequence"].astype(str).tolist()
 
@@ -57,7 +60,7 @@ def receive_strings(client_socket):
     while True:
         try:
             # Receba o comprimento da string
-            length_bytes = client_socket.recv(4)
+            length_bytes = client_socket.recv(1024)
             if not length_bytes:
                 break  # Encerra a conexão quando não há mais dados
             length = int.from_bytes(length_bytes, 'big')
@@ -77,23 +80,27 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.send(method.encode('utf-8'))
 
     # Quantidade de núcleos/nós utilizados
-    s.send(cores.to_bytes(4, 'big'))
+    s.send(int(cores).to_bytes(4, 'big'))
 
     # Nível de paralelização (CPU, GPU, distribuído, etc)
     s.send(len(level).to_bytes(4, 'big'))
     s.send(level.encode('utf-8'))
 
-    chunk_size = 100  # Tamanho de cada parte
-    for i in range(0, len(valores), chunk_size):
-        chunk = valores[i:i + chunk_size]
-        send_strings(s, chunk)
+    s.sendall('\n'.join(valores).encode('utf-8'))
+
+    s.send("final".encode('utf-8'))
+
+    print("\nEsperando resposta do servidor\n")
 
     # Receber resposta do server
-    # time_data = s.recv(8)
-    # processing_time = struct.unpack('!d', time_data)[0]
+    time_data = s.recv(8)
+    processing_time = struct.unpack('!d', time_data)[0]
+    
+    genomasProcessados = []
+    for genomas in receive_strings(s):
+        genomasProcessados.append(genomas)
 
-    # genomasProcessados = []
-    # for genomas in receive_strings(s):
-    #     genomasProcessados.append(genomas)
+    print("Tempo processamento:", processing_time)
+    print("Genomas processados:", len(genomasProcessados))
 
-print("Dados enviados com sucesso para o servidor.")
+print("Conexão finalizada com sucesso.")
