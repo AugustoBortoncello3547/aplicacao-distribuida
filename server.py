@@ -44,12 +44,12 @@ def processarParalelamenteOpenMP(genomasRecebidos, cores):
     return genomas_processados
 
 def processarParalelamenteThread(genomasRecebidos, cores):
-    steps = len(genomas_recebidos)
+    steps = len(genomasRecebidos)
     genomas_processados = List()
 
     def processar_thread(start, end):
         for i in range(start, end):
-            seq = genomas_recebidos[i]
+            seq = genomasRecebidos[i]
             complemento_inverso_seq = processar_sequencia(seq)
             genomas_processados.append(complemento_inverso_seq)
 
@@ -73,7 +73,7 @@ def processarParalelamenteMpi(genomasRecebidos, cores):
     rank = comm.Get_rank()
     size = comm.Get_size()
 
-    steps = len(genomas_recebidos)
+    steps = len(genomasRecebidos)
     genomas_processados = List()
 
     # Distribuir as tarefas entre os processos
@@ -81,7 +81,7 @@ def processarParalelamenteMpi(genomasRecebidos, cores):
     start = rank * chunk_size
     end = (rank + 1) * chunk_size if rank < size - 1 else steps
 
-    local_genomas = genomas_recebidos[start:end]
+    local_genomas = genomasRecebidos[start:end]
 
     # Processar localmente
     local_genomas_processados = [processar_sequencia(seq) for seq in local_genomas]
@@ -97,8 +97,10 @@ def processarParalelamenteMpi(genomasRecebidos, cores):
 
 def processarEmSerie(genomasRecebidos):
     genomas_processados = List()
+    steps = len(genomasRecebidos)
 
-    for seq in genomasRecebidos:
+    for i in range(steps):
+        seq = genomasRecebidos[i]
         complemento_inverso_seq = processar_sequencia(seq)
         genomas_processados.append(complemento_inverso_seq)
 
@@ -121,20 +123,6 @@ def recieve_metadata(client_socket):
 
     return method, cores, level
 
-def receive_strings(client_socket):
-    while True:
-        try:
-            # Receba o comprimento da string
-            length_bytes = client_socket.recv(4)
-            if not length_bytes:
-                break  # Encerra a conexão quando não há mais dados
-            length = int.from_bytes(length_bytes, 'big')
-            # Receba a string
-            string = client_socket.recv(length).decode('utf-8')
-            yield string
-        except ConnectionResetError:
-            break
-
 HOST = 'localhost'
 PORT = 12345
 
@@ -155,8 +143,18 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         print("Level Paralelização:", level)
 
         genomasRecebidos = []
-        for genomas in receive_strings(conn):
-            genomasRecebidos.append(genomas)
+        while True:
+            parte_dados = conn.recv(1024)
+            if not parte_dados:
+                break
+            seq = parte_dados.decode('utf-8')
+            if "final" in seq:
+                seq = seq.replace("final", "")
+                genomasRecebidos += seq
+                break
+            genomasRecebidos += seq
+
+        print("Genomas recebidos:", len(genomasRecebidos))
         
         genomas_processados = []
 
@@ -164,7 +162,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
         if(method == "OpenMP"):
             genomas_processados = processarParalelamenteOpenMP(genomasRecebidos, cores)
-        elif(method == "Threads"):
+        elif(method == "Thread"):
             genomas_processados = processarParalelamenteThread(genomasRecebidos, cores)
         elif(method == "MPI"):
             genomas_processados = processarParalelamenteMpi(genomasRecebidos, cores)
@@ -174,14 +172,16 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         end_time = time.time()
         processing_time = end_time - start_time
 
-        print("Tempo processamento:", processing_time)
+        print("\nTempo processamento:", processing_time)
+        print("Genomas processados:", len(genomas_processados))
+
+        print("\nPrimeiros genomas recebidos:", genomasRecebidos[0:10])
+        print("Primeiros genomas processados:", genomas_processados[0:10])
 
         if genomas_processados:
-            # print("Genomas processados:", len(genomas_processados))
-
             # Envio dados processados para client
             conn.send(struct.pack('!d', processing_time))
 
             for genoma in genomas_processados:
-                conn.send(len(genoma).to_bytes(4, 'big'))
+                conn.send(len(genoma).to_bytes(1024, 'big'))
                 conn.send(genoma.encode('utf-8'))
