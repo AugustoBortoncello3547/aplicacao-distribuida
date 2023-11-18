@@ -50,22 +50,12 @@ def input_data():
     
     return method, cores, level
 
-def send_strings(client_socket, strings):
-    # Dados
-    for string in strings:
-        client_socket.send(len(string).to_bytes(4, 'big'))
-        client_socket.send(string.encode('utf-8'))
-
 def receive_strings(client_socket):
     while True:
         try:
-            # Receba o comprimento da string
-            length_bytes = client_socket.recv(1024)
-            if not length_bytes:
-                break  # Encerra a conexão quando não há mais dados
-            length = int.from_bytes(length_bytes, 'big')
-            # Receba a string
-            string = client_socket.recv(length).decode('utf-8')
+            string = client_socket.recv(2018).decode('utf-8')
+            if "final" in string:
+                break
             yield string
         except ConnectionResetError:
             break

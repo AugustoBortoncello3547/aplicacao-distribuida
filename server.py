@@ -16,6 +16,25 @@ C na sequência original é substituído por G na sequência complementar.
 G na sequência original é substituído por C na sequência complementar.
 """
 
+@njit
+def processarParalelamenteOpenMP(genomasRecebidos, cores):
+    omp_set_num_threads(cores)
+    steps = len(genomasRecebidos)
+    genomas_processados = List()
+    with openmp("parallel for"):
+        for i in range(steps):
+            seq = genomasRecebidos[i]
+            complemento_inverso = ""
+            complemento = {"A": "T", "T": "A", "C": "G", "G": "C"}
+            for nucleotideo in seq:
+                if nucleotideo in complemento:
+                    complemento_inverso += complemento[nucleotideo]
+                else:
+                    complemento_inverso += nucleotideo  # Se não for A, T, C, ou G, mantém o mesmo caractere
+            with openmp("critical"):
+                genomas_processados.append(complemento_inverso)
+    return genomas_processados
+
 def processar_sequencia(seq):
     complemento_inverso = ""
     complemento = {"A": "T", "T": "A", "C": "G", "G": "C"}
@@ -144,23 +163,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         start_time = time.time()
 
         if(method == "OpenMP"):
-            
-            omp_set_num_threads(cores)
-            steps = len(genomasRecebidos)
-            genomas_processados = List.empty_list(types.unicode_type)
-
-            with openmp("parallel for"):
-                for i in range(steps):
-                    seq = genomasRecebidos[i]
-                    complemento = {"A": "T", "T": "A", "C": "G", "G": "C"}
-                    complemento_inverso_seq = ""
-                    for nucleotideo in seq:
-                        if nucleotideo in complemento:
-                            complemento_inverso_seq += complemento[nucleotideo]
-                        else:
-                            complemento_inverso_seq += nucleotideo  # Se não for A, T, C, ou G, mantém o mesmo caractere
-                    genomas_processados.append(complemento_inverso_seq)
-
+            genomas_processados = processarParalelamenteOpenMP(genomasRecebidos, cores)
         elif(method == "Thread"):
             genomas_processados = processarParalelamenteThread(genomasRecebidos, cores)
         elif(method == "MPI"):
@@ -182,5 +185,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             conn.send(str(processing_time).encode("utf-8"))
 
             for genoma in genomas_processados:
-                conn.send(len(genoma).to_bytes(1024, 'big'))
                 conn.send(genoma.encode('utf-8'))
+
+            conn.send("final".encode('utf-8'))
