@@ -3,7 +3,7 @@ from numba import njit, types
 from numba.openmp import openmp_context as openmp
 import time 
 import threading
-#from mpi4py import MPI
+from mpi4py import MPI
 from numba.openmp import omp_set_num_threads
 from numba.typed import List
 
