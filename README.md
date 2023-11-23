@@ -1,6 +1,9 @@
 # aplicacao-distribuida
 
+OBS: Para o trabalho, utilizamos um VM com o Linux Lubuntu com 4 cores configurada.
+
 # Pacotes
+
 Pacotes instalados normalmente pelo pip:
 
 threading, panda
@@ -15,6 +18,9 @@ Obs: para uma das máquinas que realizamos o teste o MPI retornou um erro para o
 
 from typing import List
 
+# Instalação PyOMP
+
+https://ava.ucs.br/courses/35878/pages/passos-para-instalacao-pyomp-na-vm?module_item_id=1200030
 
 # Rodar a aplicação
 
